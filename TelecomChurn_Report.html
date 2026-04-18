@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telecom Customer Churn Analysis — Shradha R Pai</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #13161e;
+    --surface2: #1a1e2a;
+    --border: #252a38;
+    --accent: #e8572a;
+    --accent2: #f5a623;
+    --accent3: #4ecdc4;
+    --text: #e8eaf0;
+    --text-muted: #7a8199;
+    --text-dim: #4a5068;
+    --green: #4ade80;
+    --red: #f87171;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    min-height: 100vh;
+  }
+
+  /* NOISE OVERLAY */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  .container { max-width: 960px; margin: 0 auto; padding: 0 32px; position: relative; z-index: 1; }
+
+  /* HERO */
+  .hero {
+    padding: 80px 0 60px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    top: -100px; right: -100px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(232,87,42,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .hero-tag::before { content: ''; display: block; width: 32px; height: 1px; background: var(--accent); }
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(36px, 6vw, 64px);
+    font-weight: 900;
+    line-height: 1.05;
+    color: var(--text);
+    margin-bottom: 24px;
+  }
+  h1 span { color: var(--accent); }
+  .hero-sub {
+    font-size: 16px;
+    color: var(--text-muted);
+    max-width: 580px;
+    line-height: 1.75;
+    margin-bottom: 40px;
+  }
+  .hero-meta {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+  .meta-item { display: flex; flex-direction: column; gap: 4px; }
+  .meta-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+  }
+  .meta-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  /* STAT CARDS */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    margin: 60px 0;
+    border: 1px solid var(--border);
+  }
+  .stat-card {
+    background: var(--surface);
+    padding: 28px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s ease;
+  }
+  .stat-card:hover::before { transform: scaleX(1); }
+  .stat-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .stat-num .unit { font-size: 18px; color: var(--accent); }
+  .stat-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  /* SECTIONS */
+  section { padding: 60px 0; border-bottom: 1px solid var(--border); }
+  section:last-child { border-bottom: none; }
+
+  .section-header { margin-bottom: 40px; }
+  .section-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  /* FINDING CARDS */
+  .findings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .finding-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 28px;
+    position: relative;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .finding-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .finding-icon {
+    font-size: 28px;
+    margin-bottom: 16px;
+  }
+  .finding-title {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .finding-body {
+    font-size: 13.5px;
+    color: var(--text-muted);
+    line-height: 1.7;
+    margin-bottom: 16px;
+  }
+  .finding-tag {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    padding: 4px 10px;
+    border-radius: 2px;
+    font-weight: 500;
+  }
+  .tag-high { background: rgba(232,87,42,0.12); color: var(--accent); }
+  .tag-medium { background: rgba(245,166,35,0.12); color: var(--accent2); }
+  .tag-insight { background: rgba(78,205,196,0.12); color: var(--accent3); }
+
+  /* CHURN FACTORS TABLE */
+  .factor-table { width: 100%; border-collapse: collapse; }
+  .factor-table thead tr {
+    border-bottom: 1px solid var(--border);
+  }
+  .factor-table th {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 500;
+  }
+  .factor-table td {
+    padding: 14px 16px;
+    font-size: 13.5px;
+    border-bottom: 1px solid rgba(37,42,56,0.5);
+    vertical-align: middle;
+  }
+  .factor-table tr:hover td { background: var(--surface); }
+  .factor-name { font-weight: 500; color: var(--text); }
+  .factor-behavior { color: var(--text-muted); }
+
+  /* BAR VISUALIZATION */
+  .bar-group { display: flex; flex-direction: column; gap: 18px; }
+  .bar-item { display: flex; flex-direction: column; gap: 8px; }
+  .bar-label-row { display: flex; justify-content: space-between; align-items: center; }
+  .bar-label { font-size: 13px; font-weight: 500; color: var(--text); }
+  .bar-pct { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-muted); }
+  .bar-track {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .bar-red { background: var(--red); }
+  .bar-orange { background: var(--accent); }
+  .bar-yellow { background: var(--accent2); }
+  .bar-green { background: var(--green); }
+  .bar-teal { background: var(--accent3); }
+
+  /* COMPARISON CARDS */
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .compare-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px;
+    border-radius: 2px;
+  }
+  .compare-card-title {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 20px;
+  }
+  .compare-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .compare-label { font-size: 13px; color: var(--text-muted); }
+  .compare-val { font-family: 'DM Mono', monospace; font-size: 13px; }
+  .val-high { color: var(--red); }
+  .val-low { color: var(--green); }
+
+  /* RECOMMENDATIONS */
+  .rec-list { display: flex; flex-direction: column; gap: 12px; }
+  .rec-item {
+    display: grid;
+    grid-template-columns: 48px 1fr auto;
+    gap: 20px;
+    align-items: start;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 20px 24px;
+    border-radius: 2px;
+    transition: border-color 0.2s;
+  }
+  .rec-item:hover { border-color: var(--border); }
+  .rec-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--border);
+    line-height: 1;
+    padding-top: 4px;
+  }
+  .rec-content {}
+  .rec-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; color: var(--text); }
+  .rec-desc { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+  .rec-priority {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    padding: 4px 10px;
+    border-radius: 2px;
+    white-space: nowrap;
+    align-self: start;
+    margin-top: 4px;
+  }
+  .pri-high { background: rgba(232,87,42,0.15); color: var(--accent); border: 1px solid rgba(232,87,42,0.2); }
+  .pri-med { background: rgba(245,166,35,0.12); color: var(--accent2); border: 1px solid rgba(245,166,35,0.2); }
+  .pri-low { background: rgba(78,205,196,0.1); color: var(--accent3); border: 1px solid rgba(78,205,196,0.2); }
+
+  /* TECH STACK */
+  .stack-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+  .stack-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 8px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+    border-radius: 2px;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .stack-chip:hover { border-color: var(--accent3); color: var(--accent3); }
+
+  /* FOOTER */
+  .footer {
+    padding: 48px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .footer-name { font-weight: 600; color: var(--text); }
+  .footer-links { display: flex; gap: 24px; }
+  .footer-links a {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-decoration: none;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    transition: color 0.2s;
+  }
+  .footer-links a:hover { color: var(--accent); }
+
+  /* DIVIDER */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, var(--accent) 0%, transparent 60%);
+    margin: 40px 0;
+    opacity: 0.4;
+  }
+
+  /* TWO-COL LAYOUT */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+
+  /* INSIGHT BOX */
+  .insight-box {
+    border-left: 2px solid var(--accent);
+    padding: 16px 20px;
+    background: rgba(232,87,42,0.04);
+    margin-top: 20px;
+    font-size: 13.5px;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+  .insight-box strong { color: var(--accent); }
+
+  @media (max-width: 720px) {
+    .stats-row { grid-template-columns: 1fr 1fr; }
+    .findings-grid { grid-template-columns: 1fr; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .two-col { grid-template-columns: 1fr; }
+    .rec-item { grid-template-columns: 1fr; }
+    .rec-num { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-tag">Data Analysis Report</div>
+    <h1>Telecom Customer<br><span>Churn Analysis</span></h1>
+    <p class="hero-sub">
+      A comprehensive exploratory analysis of 7,043 subscriber records to identify the behavioral, contractual, and service-level patterns that predict customer churn — and the retention levers available to the business.
+    </p>
+    <div class="hero-meta">
+      <div class="meta-item">
+        <span class="meta-label">Author</span>
+        <span class="meta-value">Shradha R Pai</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Dataset</span>
+        <span class="meta-value">IBM Telco Churn</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Records Analyzed</span>
+        <span class="meta-value">7,043 Customers</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Features</span>
+        <span class="meta-value">21 Variables</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Tools</span>
+        <span class="meta-value">Python · Seaborn · Pandas</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-num">7<span class="unit">K+</span></div>
+      <div class="stat-desc">Customer records analyzed across demographics, contracts & services</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">11</div>
+      <div class="stat-desc">Churn factors visualized across contract, payment, and service dimensions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">21</div>
+      <div class="stat-desc">Features examined including behavioral and demographic signals</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">5</div>
+      <div class="stat-desc">Actionable business recommendations derived from analysis</div>
+    </div>
+  </div>
+
+  <!-- SECTION 1: OBJECTIVE -->
+  <section>
+    <div class="section-header">
+      <div class="section-num">01 — Objective</div>
+      <h2>What We Set Out to Answer</h2>
+    </div>
+    <div class="two-col">
+      <div>
+        <p style="color: var(--text-muted); line-height: 1.8; margin-bottom: 16px;">
+          Customer churn is the silent revenue drain in the telecom industry. Every churned customer represents not just lost recurring revenue, but the cost of failed acquisition — and the far higher cost of winning them back.
+        </p>
+        <p style="color: var(--text-muted); line-height: 1.8;">
+          This analysis cuts through 7,043 subscriber records to find the patterns that separate customers who stay from those who leave — and translate those patterns into actionable retention levers.
+        </p>
+        <div class="insight-box">
+          <strong>Business Context:</strong> Acquiring a new customer costs 5–7× more than retaining an existing one. Even a 5% improvement in retention can increase profitability by 25–95% (Harvard Business Review).
+        </div>
+      </div>
+      <div>
+        <p style="color: var(--text-dim); font-family: 'DM Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 16px;">Research Questions</p>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; gap: 14px; align-items: flex-start;">
+            <span style="color: var(--accent); font-family: 'DM Mono', monospace; font-size: 12px; padding-top: 2px;">→</span>
+            <span style="color: var(--text-muted); font-size: 14px;">Which contract types are most strongly linked to churn?</span>
+          </div>
+          <div style="display: flex; gap: 14px; align-items: flex-start;">
+            <span style="color: var(--accent); font-family: 'DM Mono', monospace; font-size: 12px; padding-top: 2px;">→</span>
+            <span style="color: var(--text-muted); font-size: 14px;">Does payment method signal churn likelihood?</span>
+          </div>
+          <div style="display: flex; gap: 14px; align-items: flex-start;">
+            <span style="color: var(--accent); font-family: 'DM Mono', monospace; font-size: 12px; padding-top: 2px;">→</span>
+            <span style="color: var(--text-muted); font-size: 14px;">Do value-added services (security, backup, support) reduce churn?</span>
+          </div>
+          <div style="display: flex; gap: 14px; align-items: flex-start;">
+            <span style="color: var(--accent); font-family: 'DM Mono', monospace; font-size: 12px; padding-top: 2px;">→</span>
+            <span style="color: var(--text-muted); font-size: 14px;">How does customer tenure affect churn probability?</span>
+          </div>
+          <div style="display: flex; gap: 14px; align-items: flex-start;">
+            <span style="color: var(--accent); font-family: 'DM Mono', monospace; font-size: 12px; padding-top: 2px;">→</span>
+            <span style="color: var(--text-muted); font-size: 14px;">Which customer demographic segments are most at risk?</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 2: DATASET -->
+  <section>
+    <div class="section-header">
+      <div class="section-num">02 — Dataset</div>
+      <h2>Data Overview</h2>
+    </div>
+    <p style="color: var(--text-muted); margin-bottom: 32px; max-width: 600px;">The IBM Telco Customer Churn dataset contains 7,043 subscriber records with 21 features spanning demographics, account information, subscribed services, and churn status.</p>
+    <div class="compare-grid">
+      <div class="compare-card">
+        <div class="compare-card-title">Account Features</div>
+        <div class="compare-row"><span class="compare-label">tenure</span><span style="color:var(--text-muted);font-size:12px;">months with company</span></div>
+        <div class="compare-row"><span class="compare-label">Contract</span><span style="color:var(--text-muted);font-size:12px;">monthly / 1yr / 2yr</span></div>
+        <div class="compare-row"><span class="compare-label">PaymentMethod</span><span style="color:var(--text-muted);font-size:12px;">4 payment types</span></div>
+        <div class="compare-row"><span class="compare-label">MonthlyCharges</span><span style="color:var(--text-muted);font-size:12px;">numeric</span></div>
+        <div class="compare-row"><span class="compare-label">TotalCharges</span><span style="color:var(--text-muted);font-size:12px;">numeric</span></div>
+      </div>
+      <div class="compare-card">
+        <div class="compare-card-title">Services Subscribed</div>
+        <div class="compare-row"><span class="compare-label">PhoneService</span><span style="color:var(--text-muted);font-size:12px;">yes / no</span></div>
+        <div class="compare-row"><span class="compare-label">InternetService</span><span style="color:var(--text-muted);font-size:12px;">DSL / Fiber / None</span></div>
+        <div class="compare-row"><span class="compare-label">TechSupport</span><span style="color:var(--text-muted);font-size:12px;">yes / no / no internet</span></div>
+        <div class="compare-row"><span class="compare-label">OnlineSecurity</span><span style="color:var(--text-muted);font-size:12px;">yes / no / no internet</span></div>
+        <div class="compare-row"><span class="compare-label">OnlineBackup</span><span style="color:var(--text-muted);font-size:12px;">yes / no / no internet</span></div>
+      </div>
+      <div class="compare-card">
+        <div class="compare-card-title">Demographics</div>
+        <div class="compare-row"><span class="compare-label">gender</span><span style="color:var(--text-muted);font-size:12px;">male / female</span></div>
+        <div class="compare-row"><span class="compare-label">SeniorCitizen</span><span style="color:var(--text-muted);font-size:12px;">0 / 1</span></div>
+        <div class="compare-row"><span class="compare-label">Partner</span><span style="color:var(--text-muted);font-size:12px;">yes / no</span></div>
+        <div class="compare-row"><span class="compare-label">Dependents</span><span style="color:var(--text-muted);font-size:12px;">yes / no</span></div>
+        <div class="compare-row" style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px;">
+          <span class="compare-label" style="font-weight:600; color:var(--text);">Target: Churn</span><span style="color:var(--accent);font-size:12px;font-family:'DM Mono',monospace;">Yes / No</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 3: KEY FINDINGS -->
+  <section>
+    <div class="section-header">
+      <div class="section-num">03 — Key Findings</div>
+      <h2>What the Data Revealed</h2>
+    </div>
+    <div class="findings-grid">
+
+      <div class="finding-card">
+        <div class="finding-icon">📋</div>
+        <div class="finding-title">Contract Type is the Strongest Churn Signal</div>
+        <div class="finding-body">Month-to-month subscribers churn at dramatically higher rates than annual or two-year contract holders. The pattern is stark and consistent — as contract commitment increases, churn falls sharply. Long-term contracts create switching friction and reflect genuine customer satisfaction.</div>
+        <span class="finding-tag tag-high">HIGH IMPACT</span>
+      </div>
+
+      <div class="finding-card">
+        <div class="finding-icon">💳</div>
+        <div class="finding-title">Electronic Check = Highest Churn Risk</div>
+        <div class="finding-body">Customers paying via electronic check show the highest churn rate of all payment methods. Those enrolled in automatic payment methods — bank transfer auto-pay and credit card auto-pay — are significantly more loyal. Auto-pay is a proxy for deeper engagement and reduces billing friction.</div>
+        <span class="finding-tag tag-high">HIGH IMPACT</span>
+      </div>
+
+      <div class="finding-card">
+        <div class="finding-icon">🌐</div>
+        <div class="finding-title">Fiber Optic Users Churn More Than DSL</div>
+        <div class="finding-body">Counterintuitively, subscribers on the premium fiber optic internet plan churn at higher rates than DSL customers. This likely signals unmet expectations around price-to-performance — customers paying premium prices expect premium quality and service reliability.</div>
+        <span class="finding-tag tag-medium">MEDIUM IMPACT</span>
+      </div>
+
+      <div class="finding-card">
+        <div class="finding-icon">🛡️</div>
+        <div class="finding-title">Value-Added Services Are Retention Anchors</div>
+        <div class="finding-body">Across four separate services — tech support, online security, online backup, and device protection — the pattern is identical: customers without these add-ons churn at roughly double the rate of those who have them. Each additional service bundled acts as a retention layer.</div>
+        <span class="finding-tag tag-high">HIGH IMPACT</span>
+      </div>
+
+      <div class="finding-card">
+        <div class="finding-icon">⏱️</div>
+        <div class="finding-title">Month One is the Danger Zone</div>
+        <div class="finding-body">Churn is highest in the first month of subscription and declines steeply with tenure. Long-term customers (2+ years) almost never leave. The early customer experience is the single most critical period for retention investment — what happens in the first 90 days determines the lifetime of the relationship.</div>
+        <span class="finding-tag tag-high">HIGH IMPACT</span>
+      </div>
+
+      <div class="finding-card">
+        <div class="finding-icon">👨‍👩‍👧</div>
+        <div class="finding-title">Family Structure Anchors Customers</div>
+        <div class="finding-body">Customers with dependents are significantly less likely to churn. Those without partners also show elevated churn risk. Family plans create multi-user dependency that makes switching costly and disruptive, acting as a natural retention mechanism independent of pricing.</div>
+        <span class="finding-tag tag-insight">BEHAVIORAL INSIGHT</span>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- SECTION 4: CHURN FACTORS -->
+  <section>
+    <div class="section-header">
+      <div class="section-num">04 — Churn Factor Deep Dive</div>
+      <h2>Factor-by-Factor Breakdown</h2>
+    </div>
+
+    <div class="two-col" style="gap: 60px;">
+      <div>
+        <p style="color: var(--text-dim); font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 20px;">Churn Rate by Contract Type (Relative)</p>
+        <div class="bar-group">
+          <div class="bar-item">
+            <div class="bar-label-row">
+              <span class="bar-label">Month-to-Month</span>
+              <span class="bar-pct">Highest ↑</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill bar-red" style="width: 88%"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-label-row">
+              <span class="bar-label">One Year</span>
+              <span class="bar-pct">Moderate</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill bar-yellow" style="width: 35%"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-label-row">
+              <span class="bar-label">Two Year</span>
+              <span class="bar-pct">Lowest ↓</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill bar-green" style="width: 12%"></div></div>
+          </div>
+        </div>
+
+        <div style="height: 40px;"></div>
+
+        <p style="color: var(--text-dim); font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 20px;">Churn Rate by Payment Method (Relative)</p>
+        <div class="bar-group">
+          <div class="bar-item">
+            <div class="bar-label-row">
+              <span class="bar-label">Electronic Check</span>
+              <span class="bar-pct">Highest ↑</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill bar-red" style="width: 85%"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-label-row">
+              <span class="bar-label">Mailed Check</span>
+              <span class="bar-pct">High</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill bar-orange" style="width: 55%"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-label-row">
+              <span class="bar-label">Bank Transfer (Auto)</span>
+              <span class="bar-pct">Low</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill bar-teal" style="width: 28%"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-label-row">
+              <span class="bar-label">Credit Card (Auto)</span>
+              <span class="bar-pct">Lowest ↓</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill bar-green" style="width: 22%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p style="color: var(--text-dim); font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 20px;">Churn Rate by Internet Service</p>
+        <div class="bar-group">
+          <div class="bar-item">
+            <div class="bar-label-row">
+              <span class="bar-label">Fiber Optic</span>
+              <span class="bar-pct">Highest ↑</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill bar-red" style="width: 78%"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-label-row">
+              <span class="bar-label">DSL</span>
+              <span class="bar-pct">Moderate</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill bar-yellow" style="width: 42%"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-label-row">
+              <span class="bar-label">No Internet Service</span>
+              <span class="bar-pct">Lowest ↓</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill bar-green" style="width: 18%"></div></div>
+          </div>
+        </div>
+
+        <div style="height: 40px;"></div>
+
+        <p style="color: var(--text-dim); font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 20px;">Impact of Value-Added Services on Churn</p>
+        <table class="factor-table">
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Without</th>
+              <th>With</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="factor-name">Tech Support</td>
+              <td class="compare-val val-high">High churn</td>
+              <td class="compare-val val-low">~Half rate</td>
+            </tr>
+            <tr>
+              <td class="factor-name">Online Security</td>
+              <td class="compare-val val-high">High churn</td>
+              <td class="compare-val val-low">~Half rate</td>
+            </tr>
+            <tr>
+              <td class="factor-name">Online Backup</td>
+              <td class="compare-val val-high">2× churn</td>
+              <td class="compare-val val-low">Stable</td>
+            </tr>
+            <tr>
+              <td class="factor-name">Device Protection</td>
+              <td class="compare-val val-high">Higher</td>
+              <td class="compare-val val-low">Lower</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 5: RECOMMENDATIONS -->
+  <section>
+    <div class="section-header">
+      <div class="section-num">05 — Recommendations</div>
+      <h2>What the Business Should Do</h2>
+    </div>
+    <div class="rec-list">
+
+      <div class="rec-item">
+        <div class="rec-num">01</div>
+        <div class="rec-content">
+          <div class="rec-title">Launch a First-90-Day Retention Program</div>
+          <div class="rec-desc">Month-one churn is the highest in the entire customer lifecycle. Dedicated onboarding, proactive check-ins, and early value demonstration in the first 90 days will have the highest ROI of any retention investment. Identify customers approaching month 3 without engaging additional services as immediate intervention targets.</div>
+        </div>
+        <div class="rec-priority pri-high">Critical</div>
+      </div>
+
+      <div class="rec-item">
+        <div class="rec-num">02</div>
+        <div class="rec-content">
+          <div class="rec-title">Incentivize Auto-Pay Enrollment at Signup</div>
+          <div class="rec-desc">Electronic check customers are the highest churn cohort. Offering a small monthly discount (even ₹50–100) for auto-pay enrollment would reduce churn risk while also reducing billing operations cost. Frame it as a benefit, not a nudge.</div>
+        </div>
+        <div class="rec-priority pri-high">Critical</div>
+      </div>
+
+      <div class="rec-item">
+        <div class="rec-num">03</div>
+        <div class="rec-content">
+          <div class="rec-title">Bundle Value-Added Services into Onboarding Packages</div>
+          <div class="rec-desc">Tech support, online security, online backup, and device protection each independently halve churn rates. Rather than upselling them individually post-signup, include them in a 3-month free trial bundle at onboarding. Customers who use these services are far less likely to leave.</div>
+        </div>
+        <div class="rec-priority pri-high">Critical</div>
+      </div>
+
+      <div class="rec-item">
+        <div class="rec-num">04</div>
+        <div class="rec-content">
+          <div class="rec-title">Audit Fiber Optic Pricing and Service Quality</div>
+          <div class="rec-desc">Fiber optic subscribers — who pay the most — churn at the highest rates. This paradox signals a price-to-value mismatch. Conduct targeted surveys among fiber customers and compare complaint rates, downtime incidents, and speed consistency against DSL benchmarks before the next price revision cycle.</div>
+        </div>
+        <div class="rec-priority pri-med">Medium</div>
+      </div>
+
+      <div class="rec-item">
+        <div class="rec-num">05</div>
+        <div class="rec-content">
+          <div class="rec-title">Design Family and Multi-User Plans to Capture Single Subscribers</div>
+          <div class="rec-desc">Customers with dependents are significantly more loyal. Single customers without partners represent the highest flight risk. Offering shareable plan options or referral benefits that bring their social network onto the platform can convert single-user relationships into stickier multi-user ones.</div>
+        </div>
+        <div class="rec-priority pri-med">Medium</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- SECTION 6: TECH STACK -->
+  <section>
+    <div class="section-header">
+      <div class="section-num">06 — Methodology</div>
+      <h2>Tools & Approach</h2>
+    </div>
+    <p style="color: var(--text-muted); max-width: 600px; margin-bottom: 8px;">This is a pure EDA project — no modeling, no black-box predictions. Every insight is directly readable from the data and interpretable by a non-technical stakeholder.</p>
+    <div class="stack-row">
+      <div class="stack-chip">Python 3</div>
+      <div class="stack-chip">Pandas</div>
+      <div class="stack-chip">Matplotlib</div>
+      <div class="stack-chip">Seaborn</div>
+      <div class="stack-chip">Jupyter Notebook</div>
+      <div class="stack-chip">IBM Telco Dataset</div>
+    </div>
+    <div class="insight-box" style="margin-top: 32px;">
+      <strong>Future Scope:</strong> This EDA lays the groundwork for a churn prediction model. Next steps include feature engineering, logistic regression and random forest classifiers, SHAP value interpretation, and a customer risk scoring dashboard.
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div>
+      <div class="footer-name">Shradha R Pai</div>
+      <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">Data Analyst · Kollam, Kerala</div>
+    </div>
+    <div class="footer-links">
+      <a href="https://www.linkedin.com/in/shradha-pai/" target="_blank">LinkedIn</a>
+      <a href="https://github.com/ShradhaPai" target="_blank">GitHub</a>
+      <a href="mailto:paishradha2000@gmail.com">Email</a>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
